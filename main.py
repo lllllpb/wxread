@@ -41,18 +41,32 @@ def cal_hash(input_string):
 
     return hex(_7032f5 + _cc1055)[2:].lower()
 
+def post_with_retry(url, **kwargs):
+    """POST 请求；网络异常或返回非 JSON 时重试一次，仍失败才抛出。"""
+    for attempt in (1, 2):
+        try:
+            response = requests.post(url, timeout=30, **kwargs)
+            response.json()  # 提前校验响应体，避免循环里 json() 崩溃
+            return response
+        except (requests.exceptions.RequestException, ValueError) as exc:
+            if attempt == 2:
+                raise
+            logging.warning(f"⚠️ 请求 {url} 失败（{exc}），10 秒后重试一次...")
+            time.sleep(10)
+
+
 def get_wr_skey():
     """刷新cookie密钥"""
-    response = requests.post(RENEW_URL, headers=headers, cookies=cookies,
-                             data=json.dumps(COOKIE_DATA, separators=(',', ':')))
+    response = post_with_retry(RENEW_URL, headers=headers, cookies=cookies,
+                               data=json.dumps(COOKIE_DATA, separators=(',', ':')))
     for cookie in response.headers.get('Set-Cookie', '').split(';'):
         if "wr_skey" in cookie:
             return cookie.split('=')[-1][:8]
     return None
 
 def fix_no_synckey():
-    requests.post(FIX_SYNCKEY_URL, headers=headers, cookies=cookies,
-                             data=json.dumps({"bookIds":["3300060341"]}, separators=(',', ':')))
+    post_with_retry(FIX_SYNCKEY_URL, headers=headers, cookies=cookies,
+                    data=json.dumps({"bookIds":["3300060341"]}, separators=(',', ':')))
 
 def refresh_cookie():
     logging.info(f"🍪 刷新cookie")
@@ -86,7 +100,7 @@ while index <= READ_NUM:
 
     logging.info(f"⏱️ 尝试第 {index} 次阅读...")
     logging.info(f"📕 data: {data}")
-    response = requests.post(READ_URL, headers=headers, cookies=cookies, data=json.dumps(data, separators=(',', ':')))
+    response = post_with_retry(READ_URL, headers=headers, cookies=cookies, data=json.dumps(data, separators=(',', ':')))
     resData = response.json()
     logging.info(f"📕 response: {resData}")
 

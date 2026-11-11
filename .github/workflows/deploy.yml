@@ -53,7 +53,7 @@ jobs:
         READ_NUM: ${{ vars.READ_NUM }}  # 使用 Repository Variables
 
       run: |
-        python main.py
+        python main.py || (echo "⚠️ 首次运行失败，60 秒后自动重试一次" && sleep 60 && python main.py)
 
   keepalive-job:
     name: Keepalive Workflow
