@@ -31,6 +31,7 @@ def send_bark(title, body, group=None, url=None):
     }
     if url:
         payload["url"] = url
+    payload["level"] = os.getenv("BARK_LEVEL", "timeSensitive")
 
     req = urllib.request.Request(
         f"{server}/{key}",
