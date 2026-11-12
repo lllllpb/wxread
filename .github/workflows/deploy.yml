@@ -51,9 +51,29 @@ jobs:
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         SERVERCHAN_SPT:  ${{ secrets.SERVERCHAN_SPT }}
         READ_NUM: ${{ vars.READ_NUM }}  # 使用 Repository Variables
+        BARK_SERVER: ${{ secrets.BARK_SERVER || 'https://api.day.app' }}
+        BARK_KEY: ${{ secrets.BARK_KEY }}
 
       run: |
-        python main.py || (echo "⚠️ 首次运行失败，60 秒后自动重试一次" && sleep 60 && python main.py)
+        set +e
+        python main.py
+        rc=$?
+        if [ $rc -ne 0 ]; then
+          echo "::warning::首次运行失败（exit $rc），60 秒后自动重试一次"
+          sleep 60
+          python main.py
+          rc=$?
+        fi
+        if [ $rc -ne 0 ]; then
+          echo "::error::重试后仍失败（exit $rc），发送 Bark 告警"
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          BARK_TITLE="❌ 微信读书自动阅读失败" \
+          BARK_BODY="首次运行与自动重试均失败（exit $rc）。查看日志：$RUN_URL" \
+          BARK_GROUP="wxread" \
+          BARK_URL="$RUN_URL" \
+          python bark.py || true
+        fi
+        exit $rc
 
   keepalive-job:
     name: Keepalive Workflow
