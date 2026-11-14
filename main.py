@@ -1,4 +1,5 @@
 # main.py 主逻辑：包括字段拼接、模拟请求
+import os
 import re
 import json
 import time
@@ -122,3 +123,22 @@ logging.info("🎉 阅读脚本已完成！")
 if PUSH_METHOD not in (None, ''):
     logging.info("⏱️ 开始推送...")
     push(f"🎉 微信读书自动阅读完成！\n⏱️ 阅读时长：{(index - 1) * 0.5}分钟。", PUSH_METHOD)
+
+# 成功也发 Bark（失败有 workflow 里的重试 + 告警步骤兜底）
+try:
+    from bark import send_bark
+    run_url = ""
+    if os.getenv("GITHUB_REPOSITORY") and os.getenv("GITHUB_RUN_ID"):
+        run_url = "{}/{}/actions/runs/{}".format(
+            os.getenv("GITHUB_SERVER_URL", "https://github.com"),
+            os.getenv("GITHUB_REPOSITORY"),
+            os.getenv("GITHUB_RUN_ID"),
+        )
+    send_bark(
+        "🎉 微信读书自动阅读完成",
+        "⏱️ 阅读时长：{} 分钟。".format((index - 1) * 0.5),
+        group="wxread",
+        url=run_url or None,
+    )
+except Exception as exc:
+    logging.warning(f"bark 推送异常: {exc}")
